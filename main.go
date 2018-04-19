@@ -10,10 +10,9 @@ import (
 )
 
 type offer struct {
-	Text       string    `json:"text"`
-	Img        []string  `json:"img"`
-	Info       otherInfo `json:"info"`
-	LastIdPost string    `json:"last_id_post"`
+	Text string    `json:"text"`
+	Img  []string  `json:"img"`
+	Info otherInfo `json:"info"`
 }
 
 type otherInfo struct {
@@ -23,7 +22,10 @@ type otherInfo struct {
 	UrlPost  string `json:"url_post"`
 }
 
-type offers []offer
+type offers struct {
+	WallItem   []offer `json:"wall_item"`
+	LastIdPost string  `json:"last_id_post"`
+}
 
 func findJpg(iteration int, doc *goquery.Document) []string {
 	var urls []string
@@ -62,6 +64,7 @@ func getIdPost(number int, doc *goquery.Document) string {
 		if i != number {
 			return
 		}
+
 		postId, _ = s.Find("a").Attr("name")
 		postId = strings.Split(postId, "-")[1]
 
@@ -96,12 +99,20 @@ func getOtherInfo(number int, doc *goquery.Document) otherInfo {
 	return info
 }
 
-func (of offers)fetchInfo() offers {
-
+func (of offers) fetchInfo(last string) offers {
 	doc := scarpe()
+	flagLast := false
 	doc.Find(".pi_text").Each(func(i int, wi_body *goquery.Selection) {
-		of = append(of, offer{Text: wi_body.Text(), Img: findJpg(i, doc), Info: getOtherInfo(i, doc), LastIdPost: getLastIdPost(doc)} )
+		if last == getIdPost(i, doc) {
+			flagLast = true
+		}
+		if flagLast {
+			return
+		}
+		of.WallItem = append(of.WallItem, offer{Text: wi_body.Text(), Img: findJpg(i, doc), Info: getOtherInfo(i, doc)})
 	})
+
+	of.LastIdPost = getLastIdPost(doc)
 	return of
 }
 
@@ -128,9 +139,11 @@ func scarpe() *goquery.Document {
 	return doc
 }
 
-func hanlder(w http.ResponseWriter,_ *http.Request) {
+func hanlder(w http.ResponseWriter, r *http.Request) {
 	var o offers
-	o = o.fetchInfo()
-	byteJS,_ := json.Marshal(o)
-	fmt.Fprintln(w,string(byteJS))
+	last := r.FormValue("last_post")
+	fmt.Println(last)
+	o = o.fetchInfo(last)
+	byteJS, _ := json.Marshal(o)
+	fmt.Fprintln(w, string(byteJS))
 }
